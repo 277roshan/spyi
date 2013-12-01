@@ -43,11 +43,8 @@ def encodePGN(refImage, fileName):
 
   # Filter and compress Pixel data
   chunkData = filterPixelData(pixData, width)
-  # print "HEX: " + chunkData
   chunkData = binascii.unhexlify(chunkData)
-  # print "DECOMP: " + chunkData
   chunkData = zlib.compress(chunkData)
-  # print "COMP: " + chunkData
   writePNGChunk(image, "IDAT", chunkData)
 
   # End the PNG
@@ -114,19 +111,16 @@ def decodePNG(fileName):
   sigHex =  binascii.hexlify(image.read(8))
   if int(sigHex, 16) != PNG_SIGNATURE:
     print('ERROR: Only PNG Format is supported. Try a PNG formated image.')
-    print sigHex
     return
 
   chunkType  = "Game On"
-  scanline = -1
   refImage = []
+  idata = ''
   while chunkType != 'IEND':
     chunkSize = int(binascii.hexlify(image.read(4)), 16)
     chunkType = image.read(4)
     chunk = image.read(chunkSize)
     chunkCRC = image.read(4)
-    # print chunkType
-    # print  binascii.hexlify(chunkCRC)
 
     if chunkType == "IHDR":
       refImage, colorType, bitDepth = createRefImage(chunk)
@@ -134,8 +128,9 @@ def decodePNG(fileName):
         print('ERROR: Unsuported PNG Color Type: ' + str(colorType) + ' Try another PNG image.')
         return
     elif chunkType == "IDAT":
-      scanline = fillRefImage(refImage, chunk, bitDepth, scanline)
+      idata += chunk
 
+  fillRefImage(refImage, idata, bitDepth)
   image.close()
   print 'Done'
   return refImage
@@ -157,9 +152,10 @@ def createRefImage(chunk):
   print 'CompressionMethod: ' + str(compressionMethod) + '\tFilterMethod: ' + str(filterMethod) + '\tInterlaceMethod: ' + str(interlaceMethod)
   return (refImage, colorType, bitDepth)
 
-def fillRefImage(refImage, chunk, bitDepth, scanline):
+def fillRefImage(refImage, chunk, bitDepth):
   # Processes the IDAT chunk and creates a ref image for the PNG
 
+  scanline = -1
   chunk = zlib.decompress(chunk)
   hexData = binascii.hexlify(chunk)
   width = len(refImage)
@@ -175,7 +171,6 @@ def fillRefImage(refImage, chunk, bitDepth, scanline):
     if scanIndex == scanlineSize:
       scanIndex = 0
       filterMode = byte
-      # print "Mode: " + str(filterMode)
       prevStream = '00' * 3
       prevScan = nextScan
       nextScan = []
@@ -215,21 +210,16 @@ def fillRefImage(refImage, chunk, bitDepth, scanline):
     b = int(hexUnfiltered[bi:bi+colorLen], 16)
     refImage[pixIndex%width][scanline] = (r,g,b)
 
-  return scanline
-
 
 def paethFilter(a,b,c):
   p = a + b - c
   pa = abs(p - a)
   pb = abs(p - b)
   pc = abs(p - c)
-  # print (a,b,c), (p, pa, pb, pc)
   if pb >= pa <= pc:
     return a
   elif pb <= pc:
     return b
 
   return c
-
-
 
